@@ -1,4 +1,5 @@
-Họ tên: <điền họ tên>
+Họ tên: Đoàn Duy Bách
+MSSV: 2A202602515
 `dataset_version`: d10-21e4070301
 
 Cách chạy lại: mở `lab_day10.ipynb` trên Colab T4 và chạy từ trên xuống. Mã nằm trong `lab/` (`labels.py`, `vlm.py`, `run.py`, `reward.py`, `grpo.py`, `viz.py`, `summarize.py`), test của mình ở `lab/tests/` (`python -m pytest -q lab/tests`).
