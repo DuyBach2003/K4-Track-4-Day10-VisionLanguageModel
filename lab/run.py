@@ -78,6 +78,10 @@ def cmd_predict(a):
     run = None if a.zero_shot else _run_json(a.work, a.name)
     if not a.zero_shot and run is None:
         sys.exit(f"không thấy {a.work}/{a.name}/run.json; train trước hoặc dùng --zero-shot")
+    out = Path(a.work) / f"{a.name}_{a.split}.jsonl"
+    if out.exists() and {e["image_id"] for e in entries} <= {r["image_id"] for r in read_jsonl(out)}:
+        print(f"[{a.name}] đã có đủ dự đoán trong {out}, bỏ qua")
+        return
     coord = run["coord"] if run else "norm1000"
     model_id = run["cfg"]["model_id"] if run else vlm.MODEL_ID
     processor = vlm.load_processor(model_id)
@@ -85,7 +89,6 @@ def cmd_predict(a):
     if run and run["cfg"].get("train_projector") and n_extra == 0:
         sys.exit("setup có train projector nhưng không nạp được extra_trainable.safetensors")
     print(f"[{a.name}] coord={coord} extra_tensors={n_extra} n={len(entries)}")
-    out = Path(a.work) / f"{a.name}_{a.split}.jsonl"
     vlm.predict(model, processor, entries, a.data, out, coord=coord,
                 batch_size=a.batch_size, max_new_tokens=a.max_new_tokens)
     for r in read_jsonl(out)[:5]:
@@ -131,7 +134,7 @@ def main(argv=None):
     p.add_argument("--zero-shot", action="store_true")
     p.add_argument("--split", default="test", choices=["val", "test"])
     p.add_argument("--limit", type=int, default=0, help="chỉ chạy N ảnh đầu (gỡ lỗi trên val)")
-    p.add_argument("--batch-size", type=int, default=4)
+    p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--max-new-tokens", type=int, default=256)
     p.set_defaults(fn=cmd_predict)
 
