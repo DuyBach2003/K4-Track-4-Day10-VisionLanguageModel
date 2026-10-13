@@ -32,7 +32,11 @@ Bootstrap **ghép cặp** theo ảnh (2.000 lần, lấy mẫu lại cùng một
 | E3 (norm1000) − E4 pixel | +0,040 | +0,000 … +0,078 | 0,024 |
 | E5 − E3 | −0,007 | −0,024 … +0,010 | 0,787 |
 
-Đường loss: `report/figures/train_loss.png`. Ảnh minh hoạ (mỗi file 6 ảnh: 3 đúng nhiều nhất, 3 sai nhiều nhất, xanh = nhãn đúng, đỏ = dự đoán, kèm TP/FP/FN): `report/figures/e{0,1,2,3,5}_examples.png`, `e4_coord_scale_pixel_examples.png`.
+Đường loss (loss chỉ tính trên phần trả lời):
+
+![Đường loss E1–E4](report/figures/train_loss.png)
+
+Ảnh minh hoạ (mỗi file 6 ảnh: 3 đúng nhiều nhất, 3 sai nhiều nhất, xanh = nhãn đúng, đỏ = dự đoán, kèm TP/FP/FN): `report/figures/e{0,1,2,3,5}_examples.png`, `e4_coord_scale_pixel_examples.png`.
 
 ## 10 câu hỏi (trả lời bằng **số của bạn**, không chép lại tài liệu)
 
@@ -67,6 +71,8 @@ Khối được cập nhật (số tham số khớp `meta.trainable_params` tron
 2. **JSON hỏng do lặp vô hạn.** 14/16 output hỏng dài đúng **256 token** (chạm `max_new_tokens`): model lát kín một dải đường bằng các box `crack` liền nhau như ô lưới, cho tới khi bị cắt giữa chừng, ví dụ:
    `... {"label": "crack", "bbox_2d": [739, 560, 789, 585]}, {"label": "crack", "bbox_2d": [739, 590, 789, 615]}, {"label": "crack", "bbox_2d": [739, 620, `
    2 output còn lại sai cú pháp, ví dụ đóng bằng `776)}]`.
+
+![E0 zero-shot: 3 ảnh đúng nhiều nhất và 3 ảnh sai nhiều nhất (xanh = nhãn đúng, đỏ = dự đoán, chú thích TP/FP/FN)](report/figures/e0_examples.png)
 
 Sau khi finetune, lỗi lặp biến mất (E2/E3 có `parse_valid_rate` = 1,000) vì nhãn luôn kết thúc bằng `<|im_end|>`.
 
@@ -117,7 +123,7 @@ Khi có mask, loss của mình bắt đầu ở **1,88** (bước 1, cả 4 lầ
 
 Mình xác nhận không phiên nào xuất hiện ở hai split (giao các tập `session` đều rỗng).
 
-Ảnh là frame cắt từ video dashcam, hai frame liền nhau gần như cùng con đường, cùng ổ gà, box lệch vài pixel. Ba ảnh manhole đúng nhất trong `e3_examples.png` (`23h13m52s`, `23h13m55s`, `23h13m56s`) là ví dụ rõ: cùng một nắp cống chụp cách nhau vài giây. Chia ngẫu nhiên thì hầu hết ảnh test có "anh em sinh đôi" trong train. Model chỉ cần nhớ cảnh là đoán đúng box, và F1 đo khả năng *ghi nhớ* chứ không phải *tổng quát hoá* sang con đường chưa thấy. Đó là F1 cao giả, sẽ sụp khi triển khai trên đường mới. Chia theo phiên cho test là những đoạn đường model chưa từng thấy.
+Ảnh là frame cắt từ video dashcam, hai frame liền nhau gần như cùng con đường, cùng ổ gà, box lệch vài pixel. Mình đo trực tiếp bằng timestamp trong tên file (`python -m lab.analyze`, 1.661/2.009 ảnh có timestamp). Hai frame liền kề trong một phiên cách nhau trung vị chỉ **2,1 giây**. Nếu chia **ngẫu nhiên theo ảnh** (70/15/15, seed 0), **209/246 ảnh test (85%) có một frame train cùng phiên cách ≤ 5 giây** (trung vị 1,8 giây), và 100% cách ≤ 30 giây. Với split theo phiên của đề, con số này là **0/296**. Ba ảnh manhole đúng nhất trong `e3_examples.png` (`23h13m52s`, `23h13m55s`, `23h13m56s`) là ví dụ rõ: cùng một nắp cống chụp cách nhau vài giây. Chia ngẫu nhiên thì hầu hết ảnh test có "anh em sinh đôi" trong train. Model chỉ cần nhớ cảnh là đoán đúng box, và F1 đo khả năng *ghi nhớ* chứ không phải *tổng quát hoá* sang con đường chưa thấy. Đó là F1 cao giả, sẽ sụp khi triển khai trên đường mới. Chia theo phiên cho test là những đoạn đường model chưa từng thấy.
 
 Cái giá: phân bố lớp lệch (val chỉ có 66 pothole; trung vị diện tích box crack ở test là 1,98% khung hình so với 1,35% ở train). Và test thực chất chỉ có 3 phiên, riêng `vlc-2025-02-18-23` chiếm 213/311 ảnh (xem câu 8).
 
@@ -155,6 +161,8 @@ Recall của E3 theo diện tích box (% khung hình, IoU ≥ 0,5, đúng lớp)
 
 - **Pothole kém nhất, và không phải vì thiếu dữ liệu** (train có 1.074 box pothole, nhiều hơn manhole với 691). Box pothole nhỏ nhất (trung vị 0,42% khung hình ở test, khoảng 38×25 px trên ảnh gốc, tức chỉ vài patch 16 px sau khi gộp 2×2). Hơn nữa recall gần như **không tăng theo kích thước** (23% → 29%), nên nguyên nhân chính là **ngữ nghĩa**: ổ gà dễ lẫn với vá đường, bóng, vết dầu và cụm nứt. Lỗi lẫn lớp của E3 tăng lên 46 FP (E0 chỉ có 4), phần lớn là nhập nhằng pothole ↔ crack trên cùng một mảng đường hỏng.
 - **Crack phụ thuộc mạnh vào kích thước** (0% → 49%) và vào **cách gán nhãn**: một vùng nứt có khi được gán một box lớn, có khi nhiều box nhỏ. Model khoanh khác độ chi tiết là bị tính cả FP lẫn FN. Ví dụ trong `report/figures/e3_examples.png`, ảnh `23h30m28s990` có TP=0, FP=1, FN=7: model vẽ một box đỏ lớn phủ cả cụm, trong khi nhãn đúng gồm 7 box nhỏ (pothole + crack). Ảnh `23h24m20s251` (TP=0, FP=3, FN=4) là các box crack lệch khỏi vết nứt dài.
+![E3: 3 ảnh đúng nhiều nhất (manhole) và 3 ảnh sai nhiều nhất (cụm pothole/crack), xanh = nhãn đúng, đỏ = dự đoán](report/figures/e3_examples.png)
+
 - **Manhole dễ nhất**: hình dạng cố định (hình chữ nhật hoặc tròn, có vân kim loại), tương phản rõ, box đủ lớn. Ba ảnh đúng hoàn toàn trong `e3_examples.png` đều là manhole (TP=2, FP=0, FN=0).
 - Thêm ở mức tổng: 134 FP của E3 là box gần đúng (IoU 0,1–0,5), nhiều hơn 86 FP bịa hẳn. Nghĩa là phần lớn lỗi là **khoanh lệch**, không phải tưởng tượng ra vật. Với vật thể nhỏ, lệch vài đơn vị trên thang 0–1000 đã làm IoU tụt dưới 0,5.
 
@@ -169,12 +177,17 @@ Mình đổi **thang toạ độ** (`coord_scale`), giữ nguyên mọi thứ kh
 
 - Pixel kém hơn ở **mọi lớp** (pothole 0,261 so với 0,303, crack 0,336 so với 0,376, manhole 0,669 so với 0,697), có thêm FP và 2 output JSON hỏng. Hai đường loss gần như trùng nhau (0,515 so với 0,501), tức loss không cho thấy khác biệt này, chỉ F1 mới thấy.
 - **Độ tin cậy: yếu.** CI riêng lẻ chồng nhau (0,367–0,445 so với 0,405–0,487). Bootstrap ghép cặp cho Δ = +0,040 với CI +0,000 … +0,078 (P(Δ ≤ 0) = 0,024): cận dưới vừa chạm 0. Lại chỉ có một seed và 3 phiên test. Mình chỉ dám nói "thang 0–1000 **không kém hơn** và có xu hướng tốt hơn pixel", phù hợp với việc Qwen3-VL được pretrain trên toạ độ tương đối. Muốn khẳng định cần thêm seed hoặc thêm phiên test.
+![E4 pixel: ví dụ dự đoán (toạ độ pixel, đã quy về khung ảnh để vẽ)](report/figures/e4_coord_scale_pixel_examples.png)
+
 - Điều chắc chắn rút ra từ E4 là **phải chấm đúng thang**: cùng file dự đoán pixel đó mà chấm như norm1000 thì F1 = 0,000 (câu 3).
 
 ## E5 (tuỳ chọn): GRPO với reward IoU
 
 - **Reward** (`lab/reward.py`): 0 nếu JSON hỏng; 1 nếu cả nhãn đúng lẫn dự đoán đều rỗng; còn lại 0,2 + 0,8 × (tổng IoU các cặp khớp cùng lớp, IoU ≥ 0,5, ghép tham lam) / max(n_gt, n_pred, 1). Box bịa bị phạt qua mẫu số. **15 test** viết trước khi chạy (`lab/tests/test_reward.py`): hoàn hảo, có bọc markdown, 5 kiểu JSON hỏng, sai lớp, thừa box, rỗng, bịa trên ảnh trống, box khổng lồ, IoU đúng ngưỡng 0,5, một box đúng không được khớp hai lần. Nhãn oracle đi qua hàm reward cho 0,99.
 - **Chạy**: `trl.GRPOTrainer` 1.9.2, khởi tạo từ adapter E3, `num_generations=4`, `max_completion_length=128`, 60 bước, lr 5e-6, beta 0. Chỉ huấn luyện LoRA (39,3M), 21,2 phút, VRAM đỉnh 5,53 GB. Log: `report/runs/e5/grpo_log.jsonl`, `report/figures/e5_grpo.png`.
+
+  ![GRPO: reward trung bình và độ dài completion theo bước](report/figures/e5_grpo.png)
+
 - **Diễn biến**: reward trung bình 10 bước đầu 0,339, 10 bước cuối 0,335, tức **không tăng**, chỉ dao động mạnh theo từng ảnh (mỗi bước chỉ 1 ảnh × 4 completion). `reward_std` trong nhóm giảm từ 0,190 xuống 0,098, completion ngắn đi (85 → 64 token), tỉ lệ bị cắt ở 128 token giảm từ 0,20 xuống 0,125. Có 6,7% bước mà cả 4 completion cùng reward (advantage = 0, không học được gì).
 - **Reward hacking: không thấy.** Trên test, E5 trả `[]` 0 lần, box > 25% khung hình 0 lần, trung bình 1,63 box/ảnh (E3: 0 lần, 0 lần, 1,64 box/ảnh). Completion ngắn đi là dấu hiệu nên theo dõi, vì ít box hơn sẽ làm mẫu số nhỏ đi, nhưng số box/ảnh trên test không đổi.
 - **So với SFT**: F1 0,440 (CI 0,397–0,482) so với E3 0,446. ΔF1 ghép cặp = −0,007 (−0,024 … +0,010), P(Δ ≤ 0) = 0,79, tức **không có khác biệt**. Lý do: 60 bước × 4 completion = 240 mẫu với lr 5e-6 là quá ít để dịch chuyển một model đã SFT. Mỗi bước chỉ 1 ảnh, nên tín hiệu advantage rất nhiễu.

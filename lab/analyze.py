@@ -6,6 +6,7 @@ kiểu lỗi E0, kiểu FP, chấm sai thang, recall theo kích thước box, d�
 import collections
 import json
 import random
+import re
 import statistics
 from pathlib import Path
 
@@ -85,8 +86,45 @@ def recall_by_size(entries, preds, coord):
     return res
 
 
+def frame_time(image_id):
+    """Giây trong ngày lấy từ tên file (vlcsnap-…-HHhMMmSSsmmm hoặc YYYYMMDD_HHMMSS); None nếu không có."""
+    m = re.match(r"vlcsnap-\d{4}-\d{2}-\d{2}-(\d{2})h(\d{2})m(\d{2})s(\d+)", image_id)
+    if m:
+        h, mi, sec, ms = map(int, m.groups())
+        return h * 3600 + mi * 60 + sec + ms / 1000
+    m = re.match(r"\d{8}_(\d{2})(\d{2})(\d{2})", image_id)
+    if m:
+        h, mi, sec = map(int, m.groups())
+        return h * 3600 + mi * 60 + sec
+    return None
+
+
+def leakage(entries_by_split, seed=0):
+    """Ảnh test có frame train cùng phiên cách ≤ 5 s: split ngẫu nhiên theo ảnh so với split theo phiên."""
+    entries = [e for es in entries_by_split.values() for e in es]
+    timed = {e["image_id"]: (e["session"], frame_time(e["image_id"])) for e in entries
+             if frame_time(e["image_id"]) is not None}
+    ids = [e["image_id"] for e in entries]
+    random.Random(seed).shuffle(ids)
+    n = len(ids)
+    splits = {"ngẫu nhiên 70/15/15": (set(ids[:int(0.7 * n)]), set(ids[int(0.85 * n):])),
+              "theo phiên (đề)": ({e["image_id"] for e in entries_by_split["train"]},
+                                  {e["image_id"] for e in entries_by_split["test"]})}
+    for name, (train, test) in splits.items():
+        gaps = []
+        for i in test & timed.keys():
+            sess, t = timed[i]
+            near = [abs(t - tt) for j, (ss, tt) in timed.items() if j in train and ss == sess]
+            gaps.append(min(near) if near else float("inf"))
+        close = sum(g <= 5 for g in gaps)
+        print(f"  {name}: {close}/{len(gaps)} ảnh test ({close / len(gaps):.0%}) có frame train cùng phiên cách ≤ 5 s")
+
+
 def main():
-    entries = read_jsonl(ROOT / "data" / "splits" / "test.jsonl")
+    by_split = {s: read_jsonl(ROOT / "data" / "splits" / f"{s}.jsonl") for s in ("train", "val", "test")}
+    print("Rò rỉ theo thời gian:")
+    leakage(by_split)
+    entries = by_split["test"]
     preds = {n: {r["image_id"]: r["raw"] for r in read_jsonl(RUNS / f"{n}_test.jsonl")}
              for n in NAMES if (RUNS / f"{n}_test.jsonl").exists()}
     rows = {n: image_counts(entries, p, coord_of(n)) for n, p in preds.items()}
